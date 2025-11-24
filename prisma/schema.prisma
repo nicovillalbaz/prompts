@@ -1,0 +1,148 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS (Opciones fijas) ---
+
+enum Role {
+  USER        // Empleado normal
+  SUPERADMIN  // El jefe supremo
+}
+
+
+
+enum PermissionLevel {
+  BASIC         // Solo ve su carpeta dpto y personal
+  INTERMEDIATE  // Puede ver carpetas extra asignadas
+  FULL          // Superadmin
+}
+
+enum AccessType {
+  READ
+  WRITE
+}
+
+enum FolderType {
+  DEPARTMENT  // Carpeta raíz de departamento (IT, Ventas...)
+  PERSONAL    // Area personal de cada usuario
+  PROJECT     // Subcarpetas creadas por usuarios
+  SYSTEM      // Carpetas especiales del sistema
+}
+
+// --- TABLAS PRINCIPALES ---
+
+model User {
+  id              String          @id @default(uuid())
+  email           String          @unique
+  passwordHash    String
+  fullName        String
+  department      String
+  role            Role            @default(USER)
+  permissionLevel PermissionLevel @default(BASIC)
+  
+  // Relaciones
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Un usuario tiene una carpeta personal raíz
+  personalFolderId String?        @unique
+  personalFolder   Folder?        @relation("UserPersonalFolder", fields: [personalFolderId], references: [id])
+
+  // Cosas que ha creado
+  createdPrompts  Prompt[]        @relation("CreatedPrompts")
+  createdFolders  Folder[]        @relation("CreatedFolders")
+  
+  // Permisos especiales otorgados manualmente por el Admin
+  specialAccess   FolderPermission[]
+}
+
+model Folder {
+  id              String      @id @default(uuid())
+  name            String
+  type            FolderType
+  description     String?
+  
+  // Jerarquía de carpetas (Carpetas dentro de carpetas)
+  parentId        String?
+  parent          Folder?     @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children        Folder[]    @relation("FolderHierarchy")
+
+  // Dueño (si es personal o creada por usuario)
+  createdById     String?
+  createdBy       User?       @relation("CreatedFolders", fields: [createdById], references: [id])
+
+  // Relación inversa para carpeta raíz personal
+  userPersonalRoot User?      @relation("UserPersonalFolder")
+
+  // Acceso por departamento (null = privada o publica a todos segun logica)
+  allowedDept     String? 
+
+  // Contenido
+  prompts         Prompt[]
+  
+  // Permisos explícitos adicionales
+  accessGrants    FolderPermission[]
+
+  // Soft Delete
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+}
+
+model FolderPermission {
+  id          String     @id @default(uuid())
+  userId      String
+  folderId    String
+  accessType  AccessType @default(READ)
+  assignedAt  DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder      Folder     @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, folderId]) // Un usuario no puede tener doble permiso a la misma carpeta
+}
+
+model Prompt {
+  id              String   @id @default(uuid())
+  title           String
+  
+  // Ubicación
+  folderId        String
+  folder          Folder   @relation(fields: [folderId], references: [id])
+
+  // Autoría (La firma)
+  createdById     String
+  createdBy       User     @relation("CreatedPrompts", fields: [createdById], references: [id])
+
+  // Datos actuales (Copia rápida para búsquedas)
+  currentContent  Json     // Guarda { instruction, context, ... }
+  currentObjective String  // "Crear", "Resumir"...
+
+  // Versionado (Historial)
+  versions        PromptVersion[]
+  currentVersionId String? @unique 
+
+  // Estado
+  isLocked        Boolean  @default(false) // Solo admin puede borrar
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PromptVersion {
+  id              String   @id @default(uuid())
+  promptId        String
+  prompt          Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  
+  contentJson     Json     // El snapshot completo del prompt en ese momento
+  changeNote      String?  // Ej: "Cambié el tono a más formal"
+  
+  createdAt       DateTime @default(now())
+  createdByUserId String?  // Quién hizo esta versión específica
+}
