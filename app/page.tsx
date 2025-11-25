@@ -38,7 +38,8 @@ export default function Home() {
     const result = await savePrompt(promptData);
     
     if (result.success) {
-        alert("¡Guardado correctamente!");
+        // Usamos un modal o un toast en lugar de alert
+        alert("¡Guardado correctamente!"); 
         // Opcional: Si quieres que tras guardar te lleve a la biblioteca:
         // handleNavigate('library', { folderId: promptData.targetFolderId || 'PERSONAL_ROOT' });
     } else {
@@ -82,6 +83,8 @@ export default function Home() {
                 key={initialFolderId || 'default'} 
                 onLoad={handleLoad} 
                 initialRootId={initialFolderId}
+                // 🚨 CORRECCIÓN: Pasar la prop requerida 'onNavigate'
+                onNavigate={handleNavigate} 
             />
         )}
 
