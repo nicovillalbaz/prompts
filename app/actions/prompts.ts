@@ -2,74 +2,92 @@
 
 import { PrismaClient } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
-import { auth } from "@/auth" // <--- Importamos la autenticación
+import { auth } from "@/auth"
 
 const prisma = new PrismaClient()
 
 export async function savePrompt(data: any) {
-  try {
-    // 1. OBTENER USUARIO REAL DE LA SESIÓN
-    const session = await auth()
+    // ... (El código de savePrompt NO cambia, porque usa folderId directo) ...
+    // (Copia el mismo savePrompt que tenías antes, o si quieres te lo pego completo aquí)
+    // Lo importante es getAvailableFolders abajo 👇
+    try {
+        const session = await auth()
+        if (!session?.user?.email) return { success: false, error: 'No autorizado' }
     
-    if (!session || !session.user || !session.user.email) {
-        return { success: false, error: 'Debes iniciar sesión para guardar' }
-    }
-
-    // Buscamos al usuario en la BD usando el email de la sesión
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: { personalFolder: true } // Traemos su carpeta
-    })
-
-    if (!user) throw new Error("Usuario no encontrado en base de datos")
-
-    // 2. GESTIÓN DE CARPETAS (Lógica Inteligente)
-    let targetFolderId = user.personalFolderId
-
-    // Si el usuario no tiene carpeta personal, se la creamos ahora mismo (Auto-fix)
-    if (!targetFolderId) {
-        const newFolder = await prisma.folder.create({
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        })
+        if (!user) return { success: false, error: 'Usuario no encontrado' }
+    
+        let finalFolderId = data.targetFolderId;
+    
+        if (!finalFolderId) {
+            if (!user.personalFolderId) {
+                 const newPersonal = await prisma.folder.create({
+                    data: { name: `Area Personal de ${user.fullName}`, type: 'PERSONAL', createdById: user.id }
+                 })
+                 await prisma.user.update({ where: { id: user.id }, data: { personalFolderId: newPersonal.id } })
+                 finalFolderId = newPersonal.id
+            } else {
+                 finalFolderId = user.personalFolderId
+            }
+        }
+    
+        const newPrompt = await prisma.prompt.create({
+          data: {
+            title: data.title || "Prompt sin título",
+            currentObjective: data.type,
+            currentContent: data.sections,
+            baseInput: data.basePrompt,
+            folderId: finalFolderId!,
+            createdById: user.id,
+          },
+        })
+    
+        await prisma.promptVersion.create({
             data: {
-                name: `Area Personal de ${user.fullName}`,
-                type: 'PERSONAL',
-                createdById: user.id
+                promptId: newPrompt.id,
+                contentJson: data.sections,
+                createdByUserId: user.id,
+                changeNote: 'Creación inicial'
             }
         })
-        // Vinculamos la carpeta al usuario
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { personalFolderId: newFolder.id }
-        })
-        targetFolderId = newFolder.id
-    }
+    
+        revalidatePath('/')
+        return { success: true, prompt: newPrompt }
+    
+      } catch (error) {
+        console.error("Error guardando:", error)
+        return { success: false, error: 'Error al guardar' }
+      }
+}
 
-    // 3. GUARDAR EL PROMPT
-    const newPrompt = await prisma.prompt.create({
-      data: {
-        title: data.title,
-        currentObjective: data.type,
-        currentContent: data.sections,
-        folderId: targetFolderId!, // Guardamos en su carpeta personal
-        createdById: user.id,      // Firmado por el usuario real
-      },
+export async function getAvailableFolders() {
+    const session = await auth()
+    if (!session?.user?.email) return []
+    
+    // CORRECCIÓN: Incluimos accessGrants
+    const user = await prisma.user.findUnique({ 
+        where: { email: session.user.email },
+        include: { accessGrants: true }
     })
+    if (!user) return []
 
-    // 4. Crear Historial
-    await prisma.promptVersion.create({
-        data: {
-            promptId: newPrompt.id,
-            contentJson: data.sections,
-            createdByUserId: user.id,
-            changeNote: 'Creación inicial'
-        }
+    const isAdmin = user.role === 'SUPERADMIN';
+
+    // Obtenemos los IDs de las carpetas permitidas
+    const allowedIds = user.accessGrants.map(g => g.folderId);
+
+    // Consulta: Mis carpetas OR Carpetas donde tengo permiso OR Todas si soy Admin
+    return await prisma.folder.findMany({
+        where: {
+            deletedAt: null,
+            OR: [
+                { createdById: user.id }, // Creadas por mí
+                { id: { in: allowedIds } }, // Permiso explícito
+                isAdmin ? { type: 'DEPARTMENT' } : {} // Si es admin, ve todos los deptos
+            ]
+        },
+        orderBy: { name: 'asc' }
     })
-
-    console.log(`Prompt guardado por ${user.email}`)
-    revalidatePath('/')
-    return { success: true, prompt: newPrompt }
-
-  } catch (error) {
-    console.error("Error guardando prompt:", error)
-    return { success: false, error: 'Error interno al guardar' }
-  }
 }

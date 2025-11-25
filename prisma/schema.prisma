@@ -43,7 +43,7 @@ model User {
   email           String          @unique
   passwordHash    String
   fullName        String
-  department      String
+
   role            Role            @default(USER)
   permissionLevel PermissionLevel @default(BASIC)
   
@@ -60,7 +60,7 @@ model User {
   createdFolders  Folder[]        @relation("CreatedFolders")
   
   // Permisos especiales otorgados manualmente por el Admin
-  specialAccess   FolderPermission[]
+  accessGrants    FolderPermission[]
 }
 
 model Folder {
@@ -127,7 +127,7 @@ model Prompt {
   // Versionado (Historial)
   versions        PromptVersion[]
   currentVersionId String? @unique 
-
+  baseInput       String?  @db.Text
   // Estado
   isLocked        Boolean  @default(false) // Solo admin puede borrar
   deletedAt       DateTime?

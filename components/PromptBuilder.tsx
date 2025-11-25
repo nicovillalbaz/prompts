@@ -1,21 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { generateOptimizedPrompt } from '../services/geminiService';
-import { ObjectiveType, DetailLevelType, PromptSections, SavedPrompt } from '../types';
+import { generateOptimizedPrompt } from '@/services/geminiService';
+import { ObjectiveType, DetailLevelType, PromptSections, SavedPrompt } from '@/types';
 import { SectionInput } from './SectionInput';
+import { getAvailableFolders } from '@/app/actions/prompts'; // <--- Importante para las carpetas
 
 interface PromptBuilderProps {
-  onSave: (promptData: Omit<SavedPrompt, 'id'>) => void;
-  initialData?: SavedPrompt | null;
+  onSave: (promptData: any) => void;
+  initialData?: any | null; // Flexibilizamos el tipo para recibir datos de la BD
 }
 
 export const PromptBuilder: React.FC<PromptBuilderProps> = ({ onSave, initialData }) => {
   const [basePrompt, setBasePrompt] = useState("");
   const [objective, setObjective] = useState<ObjectiveType>(ObjectiveType.CREATE);
   const [detailLevel, setDetailLevel] = useState<DetailLevelType>(DetailLevelType.BRIEF);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [finalResult, setFinalResult] = useState("");
   const [showCopyNotification, setShowCopyNotification] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+
+  // --- NUEVOS ESTADOS PARA GUARDADO ---
+  const [fileName, setFileName] = useState("");
+  const [selectedFolder, setSelectedFolder] = useState("");
+  const [availableFolders, setAvailableFolders] = useState<any[]>([]);
 
   // State for individual sections
   const [sections, setSections] = useState<PromptSections>({
@@ -32,27 +39,45 @@ export const PromptBuilder: React.FC<PromptBuilderProps> = ({ onSave, initialDat
   // Ref to scroll to results
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Load initial data if provided (e.g. when loading from library)
-// components/PromptBuilder.tsx
+  // 1. Cargar carpetas disponibles al iniciar
+  useEffect(() => {
+    getAvailableFolders().then(folders => {
+        setAvailableFolders(folders || []);
+    });
+  }, []);
 
+  // 2. Cargar datos iniciales (si venimos de la biblioteca)
   useEffect(() => {
     if (initialData) {
-      // ANTES DECÍA: setBasePrompt(initialData.basePrompt);
-      // CÁMBIALO POR:
-      setBasePrompt(initialData.basePrompt || ""); 
+      // Recuperamos la idea original (baseInput) si existe
+      setBasePrompt(initialData.baseInput || initialData.basePrompt || "");
       
-      setObjective(initialData.type);
-      setDetailLevel(initialData.detailLevel || "General"); // También protege esto por si acaso
-      setSections(initialData.sections);
+      // Recuperamos el título como nombre de archivo
+      setFileName(initialData.title || "");
       
+      // Recuperamos la carpeta donde estaba (opcional, para que quede pre-seleccionada)
+      if (initialData.folderId) setSelectedFolder(initialData.folderId);
+
+      setObjective(initialData.type as ObjectiveType || ObjectiveType.CREATE);
+      setDetailLevel(initialData.detailLevel as DetailLevelType || DetailLevelType.BRIEF);
+      setSections(initialData.sections || initialData.currentContent); // Soporte para ambos formatos
+
+      // Scroll automático
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
   }, [initialData]);
 
+  // 3. Auto-generar nombre de archivo si está vacío (basado en la instrucción)
+  useEffect(() => {
+     if (sections.instruction && !fileName && !initialData) {
+         setFileName(sections.instruction.slice(0, 40) + "...");
+     }
+  }, [sections.instruction]);
+
   const handleImprove = async () => {
-    if (!basePrompt.trim()) return;
+    if (!basePrompt?.trim()) return;
 
     setIsLoading(true);
     try {
@@ -62,8 +87,8 @@ export const PromptBuilder: React.FC<PromptBuilderProps> = ({ onSave, initialDat
         detailLevel
       });
       setSections(optimized);
-      setSaveStatus('idle'); // Reset save status on new generation
-      // Scroll to results after short delay
+      setSaveStatus('idle'); 
+      
       setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -119,23 +144,22 @@ ${sections.outputFormat}
 
   const handleSaveClick = () => {
     if (!finalResult) return;
-
-    // Create a title from the instruction (first 60 chars)
-    const title = sections.instruction 
-        ? sections.instruction.slice(0, 60) + (sections.instruction.length > 60 ? '...' : '')
-        : `Prompt ${objective}`;
     
-    const now = new Date();
-    const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
+    if (!fileName.trim()) {
+        alert("Por favor escribe un nombre para el archivo antes de guardar.");
+        return;
+    }
 
+    // Enviamos todo al padre (page.tsx -> actions)
     onSave({
-        title,
+        title: fileName, // El nombre que eligió el usuario
         content: finalResult,
-        date: formattedDate,
+        date: new Date().toLocaleDateString(),
         type: objective,
         sections: sections,
-        basePrompt: basePrompt,
-        detailLevel: detailLevel
+        basePrompt: basePrompt, // Guardamos la idea original (IMPORTANTE)
+        detailLevel: detailLevel,
+        targetFolderId: selectedFolder || null // La carpeta elegida
     });
 
     setSaveStatus('saved');
@@ -345,6 +369,42 @@ ${sections.outputFormat}
                         {finalResult}
                     </pre>
                 </div>
+
+                {/* NUEVA ZONA DE OPCIONES DE GUARDADO */}
+                <div className="mt-6 pt-6 border-t border-indigo-100">
+                    <h3 className="text-sm font-bold text-indigo-900 mb-3 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Opciones de Guardado
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-indigo-100">
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Nombre del Archivo</label>
+                            <input 
+                                type="text" 
+                                value={fileName}
+                                onChange={(e) => setFileName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Ej: Campaña Marketing Verano"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1.5">Guardar en Carpeta</label>
+                            <select 
+                                value={selectedFolder}
+                                onChange={(e) => setSelectedFolder(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="">(Raíz - Mi Espacio)</option>
+                                {availableFolders.map(f => (
+                                    <option key={f.id} value={f.id}>
+                                        {f.type === 'DEPARTMENT' ? `🏢 ${f.name}` : `📁 ${f.name}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <p className="text-xs text-gray-400 mt-2 text-center">Tus cambios arriba se reflejan aquí en tiempo real.</p>
 
                 {showCopyNotification && (

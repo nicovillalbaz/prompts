@@ -1,69 +1,55 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { PromptBuilder } from '@/components/PromptBuilder';
 import { Library } from '@/components/Library'; 
 import { savePrompt } from '@/app/actions/prompts';
-import { getPrompts, deletePrompt } from '@/app/actions/getPrompts';
-
-// Definimos los tipos aquí para evitar errores de importación rápida
-type View = 'constructor' | 'library';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<View>('constructor');
-  const [dbPrompts, setDbPrompts] = useState<any[]>([]);
+  const [currentView, setCurrentView] = useState<string>('constructor');
   const [editingPrompt, setEditingPrompt] = useState<any>(null);
+  const [initialFolderId, setInitialFolderId] = useState<string | null>(null);
 
-  // Cargar prompts cada vez que entramos a la vista 'library'
-  useEffect(() => {
-    if (currentView === 'library') {
-        loadPrompts();
-    }
-  }, [currentView]);
-
-  const loadPrompts = async () => {
-    const result = await getPrompts();
-    if (result.success) {
-        setDbPrompts(result.prompts);
-    }
+  const handleNavigate = (view: string, params?: any) => {
+      if (view === 'library') {
+          setInitialFolderId(params?.folderId || null);
+          
+          if (params?.folderId === 'DEPARTMENT_ROOT') {
+            setCurrentView('library-department');
+          } else if (params?.folderId === 'ADMIN_ROOT') {
+            setCurrentView('library-admin');
+          } else {
+            setCurrentView('library-personal');
+          }
+      } else {
+          if (view === 'constructor') {
+            setEditingPrompt(null);
+          }
+          setCurrentView(view);
+      }
   };
 
   const handleSavePrompt = async (promptData: any) => {
     const result = await savePrompt(promptData);
     if (result.success) {
         alert("¡Guardado correctamente!");
-        // Opcional: ir a la biblioteca automáticamente
-        // setCurrentView('library'); 
     } else {
-        alert("Error al guardar");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if(confirm("¿Seguro que quieres borrar este prompt?")) {
-        await deletePrompt(id);
-        loadPrompts(); // Recargar la lista
+        alert("Error al guardar: " + result.error);
     }
   };
 
   const handleLoad = (prompt: any) => {
     setEditingPrompt({
         ...prompt,
-        sections: prompt.sections // Pasamos el JSON guardado
+        sections: prompt.sections || prompt.currentContent 
     });
     setCurrentView('constructor');
   };
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
-      <Sidebar 
-        currentView={currentView} 
-        onNavigate={(view: any) => {
-            setCurrentView(view);
-            if (view === 'constructor') setEditingPrompt(null); // Limpiar al ir a crear nuevo
-        }} 
-      />
+      <Sidebar currentView={currentView} onNavigate={handleNavigate} />
       
       <main className="flex-1 ml-64 overflow-x-hidden">
         {currentView === 'constructor' ? (
@@ -73,7 +59,9 @@ export default function Home() {
             />
         ) : (
             <Library 
-                onLoad={handleLoad}
+                key={initialFolderId || 'default'} 
+                onLoad={handleLoad} 
+                initialRootId={initialFolderId}
             />
         )}
       </main>
