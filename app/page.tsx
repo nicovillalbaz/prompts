@@ -6,6 +6,7 @@ import { PromptBuilder } from '@/components/PromptBuilder';
 import { Library } from '@/components/Library'; 
 import { UsersManager } from '@/components/UsersManager'; // <--- IMPORTANTE: Importamos el componente
 import { savePrompt } from '@/app/actions/prompts';
+import { TrashCan } from '@/components/TrashCan';
 
 export default function Home() {
   // Estados de navegación y contenido
@@ -86,6 +87,9 @@ export default function Home() {
         {/* VISTA 3: GESTIÓN DE USUARIOS (¡AQUÍ ESTÁ LA MAGIA!) */}
         {currentView === 'users' && (
             <UsersManager />
+        )}
+        {currentView === 'trash' && (
+            <TrashCan />
         )}
 
       </main>

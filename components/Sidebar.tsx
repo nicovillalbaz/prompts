@@ -16,21 +16,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
   // Cargar datos al iniciar
   useEffect(() => {
     const init = async () => {
-        // 1. Verificar Rol de Admin
         const user = await getUserInfo();
-        console.log("👤 Usuario cargado en Sidebar:", user); // <--- MIRA ESTO EN CONSOLA F12
-        
         if (user) {
             setIsAdmin(user.role === 'SUPERADMIN');
         }
 
-        // 2. Cargar botones de departamentos
         const sidebarData = await getSidebarData();
         if (sidebarData.departments) {
             setDepartments(sidebarData.departments);
         }
     };
-    
     init();
   }, []);
 
@@ -40,8 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
       await createNewDepartment(newDeptName);
       setNewDeptName("");
       setIsCreating(false);
-      // Recargar página para ver cambios rápido (o volver a llamar init)
-      window.location.reload(); 
+      window.location.reload(); // Recargar para ver cambios
   };
 
   return (
@@ -56,19 +50,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        <button onClick={() => onNavigate('constructor')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${currentView === 'constructor' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-50'}`}>
+        {/* 1. CONSTRUCTOR */}
+        <button
+            onClick={() => onNavigate('constructor')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+            currentView === 'constructor' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20"/><path d="M2 12h20"/><path d="m4.93 4.93 14.14 14.14"/><path d="m19.07 4.93-14.14 14.14"/></svg>
             Constructor
         </button>
 
         <div className="pt-6 pb-2"><p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Mis Espacios</p></div>
 
-        <button onClick={() => onNavigate('library', { folderId: 'PERSONAL_ROOT' })} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'library-personal' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'text-gray-600 hover:bg-gray-50'}`}>
+        {/* MI ESPACIO & MI DEPARTAMENTO */}
+        <button
+            onClick={() => onNavigate('library', { folderId: 'PERSONAL_ROOT' })}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            currentView === 'library-personal' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'text-gray-600 hover:bg-gray-50'
+            }`}
+        >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Mi espacio
+            Mi Espacio
         </button>
 
-        {/* --- LISTA DE DEPARTAMENTOS --- */}
         <div className="pt-6 pb-2 flex justify-between items-center pr-4">
             <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Departamentos</p>
             {isAdmin && (
@@ -98,12 +103,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
             </button>
         ))}
 
-        {/* --- BOTÓN DE ADMIN (GESTIÓN GLOBAL) --- */}
+        {departments.length === 0 && (
+            <p className="px-4 text-xs text-gray-400 italic">No tienes departamentos asignados.</p>
+        )}
+
+        {/* --- SECCIÓN ADMINISTRACIÓN --- */}
         {isAdmin && (
             <>
                 <div className="pt-6 pb-2"><p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Admin</p></div>
                 
-                {/* Botón "Todos los Dptos" (Gestión Global) */}
+                {/* 1. Gestión Global (Todos los Dptos) */}
                 <button
                     onClick={() => onNavigate('library', { folderId: 'ADMIN_ROOT' })}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'library-admin' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'text-gray-600 hover:bg-gray-50'}`}
@@ -112,13 +121,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
                     Gestión Global
                 </button>
 
-                {/* Botón "Gestión de Usuarios" */}
+                {/* 2. Gestión de Usuarios */}
                 <button
                     onClick={() => onNavigate('users')}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'users' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'text-gray-600 hover:bg-gray-50'}`}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Gestión de Usuarios
+                </button>
+                
+                {/* 3. PAPELERA DE RECICLAJE (NUEVO) */}
+                <button
+                    onClick={() => onNavigate('trash')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'trash' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    Papelera de Reciclaje
                 </button>
             </>
         )}
