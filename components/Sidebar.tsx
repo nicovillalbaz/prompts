@@ -80,6 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
                 <button onClick={() => setIsCreating(!isCreating)} className="text-indigo-600 hover:bg-indigo-50 p-1 rounded" title="Agregar Departamento">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
+                
             )}
         </div>
 
@@ -137,6 +138,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate }) => 
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                     Papelera de Reciclaje
+                </button>
+                <button
+                    onClick={() => onNavigate('library', { folderId: 'SUPER_PERSONAL_ROOT' })}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'library-super-personal' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 14.73l-3.3-3.3a2 2 0 0 0-2.83 0L10 13.5l-4.9-4.9a2 2 0 0 0-2.83 0l-3.3 3.3"/></svg>
+                    Espacios Privados
+                </button>
+                <button
+                    onClick={() => onNavigate('audit')}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${currentView === 'audit' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5l3 3L11 15 8 16l1-3z"/></svg>
+                    Auditoría de Acciones
                 </button>
             </>
         )}

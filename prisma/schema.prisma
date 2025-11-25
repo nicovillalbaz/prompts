@@ -46,6 +46,7 @@ model User {
 
   role            Role            @default(USER)
   permissionLevel PermissionLevel @default(BASIC)
+  logs AuditLog[]
   isActive        Boolean         @default(true)
   deletedAt       DateTime?
   // Relaciones
@@ -69,6 +70,7 @@ model Folder {
   name            String
   type            FolderType
   description     String?
+  isActive        Boolean @default(true)
   
   // Jerarquía de carpetas (Carpetas dentro de carpetas)
   parentId        String?
@@ -94,6 +96,17 @@ model Folder {
   // Soft Delete
   deletedAt       DateTime?
   createdAt       DateTime    @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String   // 'CREATE_PROMPT', 'DELETE_USER', 'RENAME_FOLDER', etc.
+  entityId  String?  // ID of the entity affected (Prompt ID, Folder ID, etc.)
+  details   Json     // Contiene datos como el nombre anterior, ubicación, etc.
+  timestamp DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model FolderPermission {

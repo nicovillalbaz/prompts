@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getFolderContent, createSubFolder, createDepartment, deleteItem } from '@/app/actions/browser'; // <--- Importamos deleteItem
-
+import { EditItemModal } from './EditItemModal';
 interface FileSystemItem {
   id: string;
   name: string;
@@ -17,7 +17,8 @@ export const Library: React.FC<LibraryProps> = ({ onLoad, initialRootId }) => {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialRootId || null);
   const [folderName, setFolderName] = useState("Inicio");
   const [parentId, setParentId] = useState<string | null>(null);
-  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
   const [items, setItems] = useState<FileSystemItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -54,6 +55,11 @@ export const Library: React.FC<LibraryProps> = ({ onLoad, initialRootId }) => {
       setIsLoading(false);
   }
 
+  const handleOpenEdit = (item: FileSystemItem, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita el doble clic
+    setSelectedItem(item.meta || item); // Pasamos los metadatos completos
+    setIsEditModalOpen(true);
+}
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
@@ -100,7 +106,7 @@ export const Library: React.FC<LibraryProps> = ({ onLoad, initialRootId }) => {
   }
 
   const isAdminView = currentFolderId === 'ADMIN_ROOT';
-
+  
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       {/* Barra Superior */}
@@ -194,6 +200,13 @@ export const Library: React.FC<LibraryProps> = ({ onLoad, initialRootId }) => {
 
                       {/* BOTÓN BORRAR (Ahora para TODO tipo) */}
                       <button 
+                        onClick={(e) => handleOpenEdit(item, e)}
+                        className="absolute top-2 right-10 p-1.5 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all z-10"
+                        title="Editar"
+                      >
+                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                      </button>
+                      <button 
                         onClick={(e) => handleDelete(item.id, item.type, e)}
                         className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all z-10"
                         title="Borrar"
@@ -203,7 +216,17 @@ export const Library: React.FC<LibraryProps> = ({ onLoad, initialRootId }) => {
                   </div>
               ))}
           </div>
-      )}
+        )}
+        {isEditModalOpen && selectedItem && (
+          <EditItemModal 
+              item={selectedItem}
+              onClose={() => setIsEditModalOpen(false)}
+              onSuccess={() => {
+                  loadContentWithIdFix();
+                  alert('¡Cambios guardados con éxito!');
+              }}
+          />
+        )}
     </div>
   );
 };

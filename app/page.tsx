@@ -7,6 +7,7 @@ import { Library } from '@/components/Library';
 import { UsersManager } from '@/components/UsersManager'; // <--- IMPORTANTE: Importamos el componente
 import { savePrompt } from '@/app/actions/prompts';
 import { TrashCan } from '@/components/TrashCan';
+import { AuditLogViewer } from '@/components/AuditLogViewer';
 
 export default function Home() {
   // Estados de navegación y contenido
@@ -91,7 +92,14 @@ export default function Home() {
         {currentView === 'trash' && (
             <TrashCan />
         )}
-
+        {/* VISTA 5: AUDITORÍA */}
+        {currentView === 'audit' && (
+            <div className="p-10 text-center">
+                <h1 className="text-2xl font-bold mb-4">Auditoría de Acciones</h1>
+                <p className="text-gray-500">Aquí se registrarán todas las acciones (Crear/Borrar/Renombrar).</p>
+                {<AuditLogViewer />}
+            </div>
+        )}
       </main>
     </div>
   );
