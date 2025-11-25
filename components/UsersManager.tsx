@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { getAllUsers, getAllDepartments, createUser, updateUser } from '@/app/actions/users';
+import { 
+    getAllUsers, 
+    getAllDepartments, 
+    createUser, 
+    updateUser, 
+    toggleUserStatus, 
+    deleteUser 
+} from '@/app/actions/users';
 
 export const UsersManager = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -40,7 +47,7 @@ export const UsersManager = () => {
       setFormData({
           fullName: user.name,
           email: user.email,
-          password: '', // No mostramos password
+          password: '', // No mostramos password al editar
           role: user.role,
           departmentIds: user.departments.map((d: any) => d.id)
       });
@@ -61,16 +68,44 @@ export const UsersManager = () => {
       
       let res;
       if (editingUser) {
-          // Editar (ignora password si está vacío)
+          // Editar
           res = await updateUser(editingUser.id, formData);
       } else {
           // Crear
-          if (!formData.password) return alert("Contraseña requerida");
+          if (!formData.password) {
+              alert("Contraseña requerida");
+              setIsLoading(false);
+              return;
+          }
           res = await createUser(formData);
       }
 
       if (res.success) {
           setIsModalOpen(false);
+          loadData();
+      } else {
+          alert("Error: " + res.error);
+          setIsLoading(false);
+      }
+  };
+
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+      setIsLoading(true);
+      const res = await toggleUserStatus(userId, currentStatus);
+      if (res.success) {
+          loadData();
+      } else {
+          alert("Error: " + res.error);
+          setIsLoading(false);
+      }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+      if(!confirm("¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.")) return;
+      
+      setIsLoading(true);
+      const res = await deleteUser(userId);
+      if (res.success) {
           loadData();
       } else {
           alert("Error: " + res.error);
@@ -84,7 +119,7 @@ export const UsersManager = () => {
           <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
           <button 
             onClick={handleOpenCreate}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
           >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Nuevo Usuario
@@ -98,6 +133,7 @@ export const UsersManager = () => {
                       <th className="p-4">Nombre</th>
                       <th className="p-4">Email</th>
                       <th className="p-4">Rol</th>
+                      <th className="p-4">Estado</th>
                       <th className="p-4">Departamentos Asignados</th>
                       <th className="p-4 text-right">Acciones</th>
                   </tr>
@@ -108,62 +144,84 @@ export const UsersManager = () => {
                           <td className="p-4 font-medium text-gray-900">{user.name}</td>
                           <td className="p-4">{user.email}</td>
                           <td className="p-4">
-                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${user.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                   {user.role}
                               </span>
                           </td>
                           <td className="p-4">
+                              <button 
+                                  onClick={() => handleToggleStatus(user.id, user.isActive)}
+                                  className={`px-2 py-1 rounded-full text-xs font-bold border cursor-pointer select-none transition-all w-20 text-center ${
+                                      user.isActive 
+                                      ? 'bg-green-50 text-green-600 border-green-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200' 
+                                      : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-green-50 hover:text-green-600'
+                                  }`}
+                              >
+                                  {user.isActive ? 'ACTIVO' : 'INACTIVO'}
+                              </button>
+                          </td>
+                          <td className="p-4">
                               <div className="flex flex-wrap gap-1">
                                   {user.departments.map((d: any) => (
-                                      <span key={d.id} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs border border-blue-100">
+                                      <span key={d.id} className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-xs border border-gray-200">
                                           {d.name.replace('Departamento ', '')}
                                       </span>
                                   ))}
-                                  {user.departments.length === 0 && <span className="text-gray-400 text-xs">- Ninguno -</span>}
+                                  {user.departments.length === 0 && <span className="text-gray-400 text-xs italic">- Ninguno -</span>}
                               </div>
                           </td>
                           <td className="p-4 text-right">
-                              <button 
-                                onClick={() => handleOpenEdit(user)}
-                                className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
-                              >
-                                  Editar
-                              </button>
+                              <div className="flex justify-end gap-3">
+                                <button 
+                                    onClick={() => handleOpenEdit(user)}
+                                    className="text-indigo-600 hover:text-indigo-800 font-medium"
+                                >
+                                    Editar
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="text-red-500 hover:text-red-700 font-medium"
+                                >
+                                    Eliminar
+                                </button>
+                              </div>
                           </td>
                       </tr>
                   ))}
               </tbody>
           </table>
           {users.length === 0 && !isLoading && (
-              <div className="p-8 text-center text-gray-400">No se encontraron usuarios.</div>
+              <div className="p-12 text-center text-gray-400">No se encontraron usuarios.</div>
+          )}
+          {isLoading && users.length === 0 && (
+              <div className="p-12 text-center text-gray-400">Cargando usuarios...</div>
           )}
       </div>
 
       {/* MODAL */}
       {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-fade-in-up">
-                  <h2 className="text-xl font-bold mb-4 text-gray-800">
-                      {editingUser ? 'Editar Usuario' : 'Crear Usuario'}
+                  <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">
+                      {editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
                   </h2>
                   
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleSubmit} className="space-y-5">
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
+                              <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nombre Completo</label>
                               <input 
                                   required
                                   type="text" 
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                   value={formData.fullName}
                                   onChange={e => setFormData({...formData, fullName: e.target.value})}
-                                  disabled={!!editingUser} // Nombre no editable (opcional)
                               />
                           </div>
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">Rol</label>
+                              <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Rol</label>
                               <select 
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                   value={formData.role}
                                   onChange={e => setFormData({...formData, role: e.target.value})}
                               >
@@ -174,11 +232,11 @@ export const UsersManager = () => {
                       </div>
 
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 mb-1">Email</label>
+                          <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Email Corporativo</label>
                           <input 
                               required
                               type="email" 
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-100"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-gray-100 transition-all"
                               value={formData.email}
                               onChange={e => setFormData({...formData, email: e.target.value})}
                               disabled={!!editingUser} 
@@ -187,37 +245,39 @@ export const UsersManager = () => {
 
                       {!editingUser && (
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
+                              <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Contraseña</label>
                               <input 
                                   required
                                   type="password" 
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                   value={formData.password}
                                   onChange={e => setFormData({...formData, password: e.target.value})}
+                                  placeholder="••••••••"
                               />
                           </div>
                       )}
 
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 mb-2">Asignar Departamentos</label>
+                          <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Asignar Departamentos</label>
                           <div className="border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto grid grid-cols-2 gap-2 bg-gray-50">
                               {allDepts.map(dept => (
-                                  <label key={dept.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
+                                  <label key={dept.id} className={`flex items-center gap-2 cursor-pointer p-2 rounded transition-colors ${formData.departmentIds.includes(dept.id) ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-gray-100 border border-transparent'}`}>
                                       <input 
                                           type="checkbox"
                                           checked={formData.departmentIds.includes(dept.id)}
                                           onChange={() => handleToggleDept(dept.id)}
-                                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                                       />
-                                      <span className="text-sm text-gray-700">{dept.name.replace('Departamento ', '')}</span>
+                                      <span className="text-sm text-gray-700 font-medium">{dept.name.replace('Departamento ', '')}</span>
                                   </label>
                               ))}
+                              {allDepts.length === 0 && <p className="text-xs text-gray-400 col-span-2 text-center py-2">No hay departamentos creados.</p>}
                           </div>
                       </div>
 
-                      <div className="flex justify-end gap-3 mt-6">
-                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
-                          <button type="submit" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm">
+                      <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                          <button type="submit" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition-all transform active:scale-95">
                               {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
                           </button>
                       </div>
