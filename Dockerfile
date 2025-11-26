@@ -3,42 +3,42 @@
 # ----------------------------------------------------
 FROM node:20-alpine AS builder
 
-# Configuración
 WORKDIR /app
+# Instalamos dependencias de sistema necesarias para el build
 RUN apk add --no-cache openssl git
 
-# Copiar package*.json para cache de npm
+# Copiamos archivos de configuración
 COPY package*.json ./
-
-# Copiar el directorio prisma (AHORA ANTES de npm install)
-# Esto asegura que prisma generate encuentre schema.prisma
-COPY prisma ./prisma/
-
-# Instalar dependencias (Esto ejecutará prisma generate via postinstall)
-RUN npm install
-
-# Copiar el resto del código fuente
+COPY prisma ./prisma/  
 COPY . .
 
-# Ejecutar el build de Next.js
+# 1. Instalar TODAS las dependencias (incluyendo dev para generar el cliente)
+RUN npm install
+
+# 2. Ejecutar el build de Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
+# 3. Limpieza SEGURA: Elimina dependencias de desarrollo sin romper nada
+RUN npm prune --production  # <-- ESTO EVITA EL ERROR "prisma not found"
+
 # ----------------------------------------------------
-# STAGE 2: PRODUCCIÓN (Optimizado y Ligero)
+# STAGE 2: PRODUCCIÓN (La imagen final que corre tu app)
 # ----------------------------------------------------
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copiar solo los archivos necesarios para la ejecución (mínimo consumo de espacio)
+# 4. INSTALACIÓN CRÍTICA: OpenSSL en producción
+RUN apk add --no-cache openssl  # <-- ESTO ARREGLA EL "INTERNAL SERVER ERROR"
+
+# 5. Copiar los archivos necesarios desde la etapa 'builder'
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma ./prisma 
+COPY --from=builder /app/node_modules ./node_modules
 
-# Puerto de la aplicación Next.js
+# Puerto y comando de inicio
 EXPOSE 3000
-
-# Comando de inicio
 CMD ["npm", "start"]
